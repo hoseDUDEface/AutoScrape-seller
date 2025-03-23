@@ -1,0 +1,7 @@
+playwright
+PyQt5
+PyQt5_sip
+selenium
+selenium_stealth
+seleniumbase
+undetected_chromedriver
