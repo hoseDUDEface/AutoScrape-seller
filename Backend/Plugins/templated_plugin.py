@@ -1,15 +1,8 @@
-# AutoScrape
-
-
-
-![image](https://github.com/user-attachments/assets/67d10bf8-84ca-4536-a275-dcc2336921d4)
-
-
-```python
 from dataclasses import dataclass
 from typing import Any, Optional, List, Type, Union
 from enum import Enum, auto
 
+# Define data types enum for clarity
 class DataType(Enum):
     STRING = auto()
     INTEGER = auto()
@@ -21,6 +14,7 @@ class DataType(Enum):
     IMAGE = auto()
     ARRAY = auto()
     OBJECT = auto()
+    # Add more types as needed
 
 @dataclass
 class ScrapedField:
@@ -61,4 +55,3 @@ class ScraperPlugin:
             List of ScrapedField objects
         """
         raise NotImplementedError("Plugins must implement parse()")
-```

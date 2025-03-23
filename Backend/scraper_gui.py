@@ -1,8 +1,10 @@
 import sys
+import os  # Add this at the top with other imports
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QGridLayout, QPushButton, QLabel, 
                             QLineEdit, QFileDialog, QFrame, QSizePolicy,
-                            QTextEdit, QTabWidget, QScrollArea, QFormLayout, QSpinBox)
+                            QTextEdit, QTabWidget, QScrollArea, QFormLayout, QSpinBox, 
+                            QComboBox) 
 from PyQt5.QtCore import Qt, QFile, QTextStream
 from PyQt5.QtGui import QColor, QPalette, QFont
 
@@ -55,6 +57,7 @@ class DarkThemeApp(QMainWindow):
         # Create components
         self.create_file_section()
         self.create_button_grid()
+        self.create_plugin_dropdown()
         self.create_run_button()
         
         # Create split view for tabs and data analysis
@@ -253,12 +256,103 @@ class DarkThemeApp(QMainWindow):
         QPushButton#cancel_button:hover {
             background-color: #FF5555;
         }
+         QComboBox {
+            background-color: #2D2D2D;
+            color: #FFFFFF;
+            border: 1px solid #3D3D3D;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 13px;
+            min-height: 30px;
+        }
+        QComboBox::drop-down {
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 20px;
+            border-left: 1px solid #3D3D3D;
+            border-top-right-radius: 6px;
+            border-bottom-right-radius: 6px;
+        }
+        QComboBox::down-arrow {
+            image: none;
+            width: 0px;
+            height: 0px;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 6px solid #FFFFFF;
+        }
+        QComboBox QAbstractItemView {
+            background-color: #2D2D2D;
+            color: #FFFFFF;
+            border: 1px solid #3D3D3D;
+            selection-background-color: #FF6600;
+            outline: none;
+        }
         """
         
         self.setStyleSheet(style_sheet)
     
 
-    
+    def create_plugin_dropdown(self):
+        # Create widget and layout for the dropdown
+        dropdown_widget = QWidget()
+        dropdown_widget.setMinimumHeight(40)  # Ensure minimum height is set
+        dropdown_layout = QHBoxLayout(dropdown_widget)
+        dropdown_layout.setContentsMargins(5, 5, 5, 5)  # Add some padding
+        
+        # Create label for plugin dropdown
+        plugin_label = QLabel("Parse Mode:")
+        dropdown_layout.addWidget(plugin_label)
+        
+        # Create dropdown (QComboBox) for plugins
+        self.plugin_dropdown = QComboBox()
+        self.plugin_dropdown.setMinimumHeight(30)  # Set minimum height
+        self.plugin_dropdown.setMinimumWidth(200)  # Set minimum width
+        
+        # Add default option
+        self.plugin_dropdown.addItem("Download HTML")
+        
+        # Add plugin files
+        plugin_files = self.get_plugin_files()
+        if len(plugin_files) > 0:
+            for file in plugin_files:
+                self.plugin_dropdown.addItem(file)
+        else:
+            # For debugging - add a placeholder item to ensure the dropdown shows something
+            print("No plugin files found")
+        
+        dropdown_layout.addWidget(self.plugin_dropdown, 1)  # Add stretch factor of 1
+        
+        # Add to main layout
+        self.main_layout.addWidget(dropdown_widget)
+        
+        # Add separator line after dropdown for visibility
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setStyleSheet("background-color: #333333;")
+        self.main_layout.addWidget(separator)
+
+    def get_plugin_files(self):
+        plugin_dir = "./Plugins/"
+        files = []
+        
+        try:
+            # Check if the directory exists
+            if os.path.exists(plugin_dir):
+                # Get all JSON files in the directory
+                files = [file for file in os.listdir(plugin_dir) if file.endswith('.py')]
+            else:
+                # Try creating the directory
+                try:
+                    os.makedirs(plugin_dir)
+                except Exception as e:
+                    print(f"Failed to create plugin directory: {e}")
+        except Exception as e:
+            print(f"Error reading plugin directory: {e}")
+        
+        return files
+        
     def create_file_section(self):
         # Create vertical layout for file input
         file_frame = QWidget()
