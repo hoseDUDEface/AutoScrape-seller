@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QHBoxLayout, QGridLayout, QPushButton, QLabel, 
                             QLineEdit, QFileDialog, QFrame, QSizePolicy,
                             QTextEdit, QTabWidget, QScrollArea, QFormLayout, QSpinBox, 
-                            QComboBox) 
+                            QComboBox, QTableWidget, QTableWidgetItem) 
 from PyQt5.QtCore import Qt, QFile, QTextStream
 from PyQt5.QtGui import QColor, QPalette, QFont
 
@@ -13,8 +13,8 @@ class FlowLayout(QVBoxLayout):
     """A custom layout that mimics a FlowLayoutPanel from WinForms"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setSpacing(5)
-        self.setContentsMargins(5, 5, 5, 5)
+        self.setSpacing(2) 
+        self.setContentsMargins(2, 2, 2, 2)
 
 
 class DarkThemeApp(QMainWindow):
@@ -181,22 +181,28 @@ class DarkThemeApp(QMainWindow):
             background-color: #1E1E1E;
             color: #00FF00;
             border-radius: 4px;
-            padding: 6px;
-            margin: 2px;
+            padding: 2px 4px;
+            margin: 1px;
+            font-size: 12px;
+            max-height: 16px;
         }
         QLabel#warning_tab_label {
             background-color: #1E1E1E;
             color: #FFFF00;
             border-radius: 4px;
-            padding: 6px;
-            margin: 2px;
+            padding: 2px 4px;
+            margin: 1px;
+            font-size: 12px;
+            max-height: 16px;
         }
         QLabel#error_tab_label {
             background-color: #1E1E1E;
             color: #FF0000;
             border-radius: 4px;
-            padding: 6px;
-            margin: 2px;
+            padding: 2px 4px;
+            margin: 1px;
+            font-size: 12px;
+            max-height: 16px;
         }
         QLabel#data_header {
             font-size: 15px;
@@ -287,6 +293,25 @@ class DarkThemeApp(QMainWindow):
             border: 1px solid #3D3D3D;
             selection-background-color: #FF6600;
             outline: none;
+        }
+        QTableWidget {
+            background-color: #2D2D2D;
+            color: #FFFFFF;
+            border: 1px solid #3D3D3D;
+            gridline-color: #444444;
+        }
+        QHeaderView::section {
+            background-color: #333333;
+            color: #FFFFFF;
+            padding: 5px;
+            border: 1px solid #3D3D3D;
+        }
+        QTableWidget::item {
+            padding: 5px;
+        }
+        QTableWidget::item:selected {
+            background-color: #FF6600;
+            color: #000000;
         }
         """
         
@@ -506,7 +531,7 @@ class DarkThemeApp(QMainWindow):
         self.create_tab_system(split_layout)
         
         # Create right side (data analysis)
-        # self.create_data_analysis(split_layout)
+        self.create_data_analysis(split_layout)
         
         # Add the split layout to the main layout
         self.main_layout.addLayout(split_layout, 1)  # 1 is the stretch factor
@@ -577,58 +602,37 @@ class DarkThemeApp(QMainWindow):
     def create_data_analysis(self, parent_layout):
         # Create widget for data analysis
         self.data_analysis = QWidget()
-        self.data_layout = QGridLayout(self.data_analysis)
-        self.data_layout.setSpacing(10)
+        data_layout = QVBoxLayout(self.data_analysis)
+        data_layout.setSpacing(10)
         
-        # Row 0: XX processed
-        self.processed_label = QLabel("0 processed")
-        self.processed_label.setObjectName("data_header")
-        self.data_layout.addWidget(self.processed_label, 0, 0, 1, 2)
+        # Add "done/total" counter at the top
+        counter_layout = QHBoxLayout()
+        self.done_total_label = QLabel("Processing: 0/0")
+        self.done_total_label.setObjectName("data_header")
+        counter_layout.addWidget(self.done_total_label)
+        counter_layout.addStretch(1)
+        data_layout.addLayout(counter_layout)
         
-        # Row 1: Avg prices header
-        self.avg_prices_label = QLabel("Avg prices")
-        self.avg_prices_label.setObjectName("data_header")
-        self.avg_prices_label.setAlignment(Qt.AlignCenter)
-        self.data_layout.addWidget(self.avg_prices_label, 1, 0, 1, 2)
+        # Add a separator
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setStyleSheet("background-color: #333333;")
+        data_layout.addWidget(separator)
         
-        # Row 2: Column headers
-        self.min_label = QLabel("min")
-        self.min_label.setObjectName("data_subheader")
-        self.data_layout.addWidget(self.min_label, 2, 0)
+        # Add results table
+        table_label = QLabel("Plugin Results:")
+        table_label.setObjectName("data_header")
+        data_layout.addWidget(table_label)
         
-        self.avg_1d_label = QLabel("avg 1d")
-        self.avg_1d_label.setObjectName("data_subheader")
-        self.data_layout.addWidget(self.avg_1d_label, 2, 1)
+        self.results_table = QTableWidget()
+        self.results_table.setColumnCount(3)  # Name, Value, Description
+        self.results_table.setHorizontalHeaderLabels(["Field", "Value", "Description"])
+        self.results_table.horizontalHeader().setStretchLastSection(True)
+        self.results_table.setColumnWidth(0, 150)  # Set width for Field column
+        self.results_table.setColumnWidth(1, 200)  # Set width for Value column
         
-        # Row 3: Values for min and avg 1d
-        self.min_value = QLabel("0.00")
-        self.min_value.setObjectName("data_value")
-        self.data_layout.addWidget(self.min_value, 3, 0)
-        
-        self.avg_1d_value = QLabel("0.00")
-        self.avg_1d_value.setObjectName("data_value")
-        self.data_layout.addWidget(self.avg_1d_value, 3, 1)
-        
-        # Row 4: More column headers
-        self.avg_7d_label = QLabel("avg 7d")
-        self.avg_7d_label.setObjectName("data_subheader")
-        self.data_layout.addWidget(self.avg_7d_label, 4, 0)
-        
-        self.avg_30d_label = QLabel("avg 30d")
-        self.avg_30d_label.setObjectName("data_subheader")
-        self.data_layout.addWidget(self.avg_30d_label, 4, 1)
-        
-        # Row 5: Values for avg 7d and avg 30d
-        self.avg_7d_value = QLabel("0.00")
-        self.avg_7d_value.setObjectName("data_value")
-        self.data_layout.addWidget(self.avg_7d_value, 5, 0)
-        
-        self.avg_30d_value = QLabel("0.00")
-        self.avg_30d_value.setObjectName("data_value")
-        self.data_layout.addWidget(self.avg_30d_value, 5, 1)
-        
-        # Add stretcher
-        self.data_layout.setRowStretch(6, 1)
+        data_layout.addWidget(self.results_table, 1)  # Add stretch factor of 1
         
         # Add data analysis widget to parent layout
         parent_layout.addWidget(self.data_analysis, 2)  # 2 parts for data analysis (right side)
@@ -637,32 +641,41 @@ class DarkThemeApp(QMainWindow):
         """Add a URL to the In tab (green)"""
         label = QLabel(url)
         label.setObjectName("in_tab_label")
+        label.setFixedHeight(18)  # Set fixed height
+        label.setWordWrap(False)  # Prevent word wrapping
+        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # Align text properly
         self.in_layout.addWidget(label)
         if num == 0:
             self.tab_widget.setTabText(0, "Done")
         else:
             self.tab_widget.setTabText(0, "Done "+str(num))
-    
+
     def add_url_to_warning_tab(self, url, num=0):
         """Add a URL to the Warning tab (yellow)"""
         label = QLabel(url)
         label.setObjectName("warning_tab_label")
+        label.setFixedHeight(18)  # Set fixed height
+        label.setWordWrap(False)  # Prevent word wrapping
+        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # Align text properly
         self.warning_layout.addWidget(label)
         if num == 0:
             self.tab_widget.setTabText(1, "Warning")
         else:
             self.tab_widget.setTabText(1, "Warning "+str(num))
-    
+
     def add_url_to_error_tab(self, url, num=0):
         """Add a URL to the Error tab (red)"""
         label = QLabel(url)
         label.setObjectName("error_tab_label")
+        label.setFixedHeight(18)  # Set fixed height
+        label.setWordWrap(False)  # Prevent word wrapping
+        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # Align text properly
         self.error_layout.addWidget(label)
         if num == 0:
             self.tab_widget.setTabText(2, "Error")
         else:
             self.tab_widget.setTabText(2, "Error "+str(num))
-    
+            
     def select_button_by_sender(self, button):
         """
         Handle button clicks and select the appropriate button.
@@ -864,12 +877,8 @@ class DarkThemeApp(QMainWindow):
                     else:
                         self.add_url_to_error_tab(url.strip())
         
-        # Example: Update data analysis with some test values
-        self.update_processed_count(len(file_paths.split('\n')) if file_paths else 0)
-        self.update_min_value(12.34)
-        self.update_avg_1d_value(23.45)
-        self.update_avg_7d_value(34.56)
-        self.update_avg_30d_value(45.67)
+    def cancel_scraping(self):
+        pass
 
 
 if __name__ == "__main__":

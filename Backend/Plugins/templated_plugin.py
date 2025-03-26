@@ -12,9 +12,7 @@ class DataType(Enum):
     DATETIME = auto()
     URL = auto()
     IMAGE = auto()
-    ARRAY = auto()
-    OBJECT = auto()
-    # Add more types as needed
+
 
 @dataclass
 class ScrapedField:
@@ -55,3 +53,15 @@ class ScraperPlugin:
             List of ScrapedField objects
         """
         raise NotImplementedError("Plugins must implement parse()")
+    
+    def get_available_fields(self) -> List[ScrapedField]:
+        """
+        Returns a list of all possible fields this plugin can extract, with default values.
+        This serves as documentation and a template for what can be extracted.
+        
+        Returns:
+            List of ScrapedField objects with default values
+        """
+        # Base implementation returns empty list
+        # Subclasses should override this to provide their specific fields
+        return []

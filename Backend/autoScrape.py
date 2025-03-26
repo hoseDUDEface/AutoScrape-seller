@@ -2,17 +2,19 @@ import sys
 import os
 backend_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend')
 sys.path.append(backend_path)
-from PyQt5.QtWidgets import QApplication, QFileDialog
+from PyQt5.QtWidgets import QApplication, QFileDialog, QTableWidgetItem
 from PyQt5.QtCore import QThread, pyqtSignal
 from seleniumScrape import getHtmlAdvanced, create_driver_undetected, create_driver_stealth, create_driver_standard, create_driver_seleniumbase
 from scraper_gui import DarkThemeApp
 from heroPy import scrape_with_js
+from enum import Enum, auto
 
 class ScraperWorker(QThread):
     url_status = pyqtSignal(int, str)  # Signal for URL status: 0=success, 1=warning, 2=error
     finished = pyqtSignal()           # Signal for completion notification
     remove_url = pyqtSignal(str)      # Signal to remove a successful URL from the input box
     suspend_execution = pyqtSignal(int, str)  # Signal to suspend execution with timeout and reason
+    plugin_results = pyqtSignal(list)  # Signal to send plugin results to the app
     
     def __init__(self, options, urls, timeout_value):
         super().__init__()
@@ -298,6 +300,7 @@ class ScraperWorker(QThread):
                 except Exception as e:
                     print(f"> Error closing browser: {str(e)}")
     
+
     def process_html(self, html, url, index):
         """Process HTML content that was scraped and emit appropriate status signal"""
         # First determine status
@@ -331,11 +334,126 @@ class ScraperWorker(QThread):
         # If we got here, it's a successful retrieval
         print(f"> Success! Retrieved {len(html)} characters of HTML")
         
+        # Apply the selected plugin if not in "Download HTML" mode
+        app = QApplication.instance()
+        main_window = None
+        
+        # Find the main window
+        for widget in app.topLevelWidgets():
+            if isinstance(widget, ScraperApp):
+                main_window = widget
+                break
+                
+        if main_window and main_window.selected_plugin != "Download HTML":
+            try:
+                # Import the selected plugin
+                import importlib.util
+                import sys
+                # Import here explicitly to avoid scope issues
+                import os as os_module
+                
+                plugins_dir = os.path.abspath("./Plugins/")
+                plugin_path = os.path.join(plugins_dir, main_window.selected_plugin)
+                
+                print(f"> Loading plugin: {plugin_path}")
+                
+                # Add Plugins directory to Python path temporarily to help with imports
+                if plugins_dir not in sys.path:
+                    sys.path.insert(0, plugins_dir)
+                
+                # Copy templated_plugin.py contents for any plugin that needs it
+                # This defines the needed classes in memory
+                if "templated_plugin" not in sys.modules:
+                    try:
+                        # Define DataType enum and ScrapedField class directly
+                        class DataType(Enum):
+                            STRING = auto()
+                            INTEGER = auto()
+                            FLOAT = auto()
+                            BOOLEAN = auto()
+                            DATE = auto()
+                            DATETIME = auto()
+                            URL = auto()
+                            IMAGE = auto()
+                            ARRAY = auto()
+                            OBJECT = auto()
+
+                        class ScrapedField:
+                            """Represents a single piece of data extracted from HTML."""
+                            def __init__(self, name, value, field_type, found=True, description=None, accumulate=False):
+                                self.name = name
+                                self.value = value
+                                self.field_type = field_type
+                                self.found = found
+                                self.description = description
+                                self.accumulate = accumulate
+                        
+                        # Create a fake module to provide these classes to the plugins
+                        class FakeModule:
+                            pass
+                        
+                        fake_templated_plugin = FakeModule()
+                        fake_templated_plugin.DataType = DataType
+                        fake_templated_plugin.ScrapedField = ScrapedField
+                        
+                        # Add to sys.modules
+                        sys.modules['templated_plugin'] = fake_templated_plugin
+                        
+                        print("> Created templated_plugin module in memory")
+                    except Exception as e:
+                        print(f"> Error creating templated_plugin module: {str(e)}")
+                
+                # Load the module
+                spec = importlib.util.spec_from_file_location("plugin_module", plugin_path)
+                if spec is None:
+                    print(f"> Error: Could not find plugin at {plugin_path}")
+                else:
+                    plugin_module = importlib.util.module_from_spec(spec)
+                    sys.modules["plugin_module"] = plugin_module  # Add to sys.modules for imports to work
+                    spec.loader.exec_module(plugin_module)
+                    
+                    # Find the plugin class in the module
+                    # We're looking for a class that inherits from ScraperPlugin or DataAnalysisPlugin
+                    plugin_class = None
+                    for name, obj in plugin_module.__dict__.items():
+                        if isinstance(obj, type) and hasattr(obj, 'parse') and callable(obj.parse):
+                            plugin_class = obj
+                            break
+                    
+                    if plugin_class:
+                        print(f"> Found plugin class: {plugin_class.__name__}")
+                        
+                        # Create an instance and parse the HTML
+                        plugin_instance = plugin_class()
+                        parsed_results = plugin_instance.parse(html)
+                        
+                        print(f"\n> Plugin results for {url}:")
+                        for field in parsed_results:
+                            print(f"  {field.name}: {field.value}" + 
+                                (f" ({field.description})" if field.description else ""))
+                        
+                        # Emit the results to the app
+                        self.plugin_results.emit(parsed_results)
+                        
+                    else:
+                        print(f"> Error: Could not find plugin class in {plugin_path}")
+                    
+                    # Clean up - remove our module to avoid conflicts
+                    if "plugin_module" in sys.modules:
+                        del sys.modules["plugin_module"]
+            except Exception as e:
+                print(f"> Error applying plugin: {str(e)}")
+                import traceback
+                traceback.print_exc()  # Print full traceback for debugging
+        
         try:
+            # Import os explicitly to avoid scope issues
+            import os as os_module
+            
             # Create output directory if it doesn't exist
             output_dir = "scraped_html"
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
+            if not os_module.path.exists(output_dir):
+                os_module.makedirs(output_dir)
                     
             # Create a safe filename from the URL
             safe_filename = url.replace("http://", "").replace("https://", "")
@@ -345,7 +463,7 @@ class ScraperWorker(QThread):
             safe_filename = f"{safe_filename}_{index}.html"
             
             # Save the file
-            file_path = os.path.join(output_dir, safe_filename)
+            file_path = os_module.path.join(output_dir, safe_filename)
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(html)
             print(f"> HTML saved to: {file_path}")
@@ -376,6 +494,12 @@ class ScraperApp(DarkThemeApp):
         self.success_count = 0
         self.warning_count = 0
         self.error_count = 0
+        
+        # Initialize dictionary to store accumulated results
+        self.accumulated_results = {}
+        
+        # Initialize total URLs count
+        self.total_urls = 0
 
         # Load files
         self.browse_button.clicked.disconnect()
@@ -428,9 +552,21 @@ class ScraperApp(DarkThemeApp):
         self.success_count = 0
         self.warning_count = 0
         self.error_count = 0
+        
+        # Clear accumulated results for a new run
+        self.accumulated_results = {}
+        
+        # Clear the results table
+        self.results_table.setRowCount(0)
             
         # Get all the selected options
         options = {k: v for k, v in self.selected_buttons.items()}
+        
+        # Store the selected plugin
+        self.selected_plugin = self.plugin_dropdown.currentText()
+        
+        # Disable the plugin dropdown during scraping
+        self.plugin_dropdown.setEnabled(False)
         
         # Get URLs from the text edit
         urls_text = self.file_path_input.toPlainText().strip()
@@ -439,6 +575,12 @@ class ScraperApp(DarkThemeApp):
             
         # Split into individual URLs
         urls = [url.strip() for url in urls_text.split('\n') if url.strip()]
+        
+        # Set total URLs count
+        self.total_urls = len(urls)
+        
+        # Update the counter
+        self.update_done_total_counter()
         
         # Get timeout value from the spinbox
         timeout_seconds = self.timeout_value.value()
@@ -451,6 +593,7 @@ class ScraperApp(DarkThemeApp):
         self.worker.finished.connect(self.scraping_finished)
         self.worker.remove_url.connect(self.remove_url_from_input)
         self.worker.suspend_execution.connect(self.show_suspension_timer)
+        self.worker.plugin_results.connect(self.handle_plugin_results)  # Connect the new signal
         
         # Update UI state
         self.is_scraping = True
@@ -460,6 +603,126 @@ class ScraperApp(DarkThemeApp):
         
         # Start the worker thread
         self.worker.start()
+    
+    def handle_plugin_results(self, results):
+        """Handle the plugin results received from the worker thread"""
+        # Update accumulated results
+        for field in results:
+            field_name = field.name
+            field_value = field.value
+            
+            # Get the type name as a string for comparison
+            field_type_name = field.field_type.name if hasattr(field.field_type, 'name') else str(field.field_type)
+            
+            # Handle accumulation for numeric fields - check the field type name
+            if hasattr(field, 'accumulate') and field.accumulate and field_type_name in ['INTEGER', 'FLOAT']:
+                # Convert value to float or int if needed
+                if isinstance(field_value, str):
+                    try:
+                        if field_type_name == 'INTEGER':
+                            field_value = int(field_value)
+                        else:
+                            field_value = float(field_value)
+                    except (ValueError, TypeError):
+                        # If conversion fails, don't accumulate
+                        field_value = field.value
+                
+                # Accumulate the value
+                if field_name in self.accumulated_results:
+                    self.accumulated_results[field_name]['value'] += field_value
+                else:
+                    self.accumulated_results[field_name] = {
+                        'value': field_value,
+                        'type': field.field_type,
+                        'description': field.description
+                    }
+            else:
+                # For non-accumulated fields, just update the value
+                self.accumulated_results[field_name] = {
+                    'value': field_value,
+                    'type': field.field_type,
+                    'description': field.description
+                }
+        
+        # Update the table
+        self.update_results_table()
+
+    def update_results_table(self):
+        """Update the results table with the current accumulated results"""
+        print(f"> Updating results table with {len(self.accumulated_results)} fields")
+        
+        # Clear the table
+        self.results_table.setRowCount(0)
+        
+        # Add rows for each field
+        for i, (name, data) in enumerate(self.accumulated_results.items()):
+            self.results_table.insertRow(i)
+            
+            # Format the name with "Sum of" or "Last" prefix based on data type
+            value = data['value']
+            field_type = data.get('type')
+            
+            # Get the field type name as a string
+            field_type_name = field_type.name if hasattr(field_type, 'name') else str(field_type)
+            
+            # Check if this field should be displayed as accumulated
+            is_accumulated = False
+            if isinstance(value, (int, float)) and field_type_name in ['INTEGER', 'FLOAT']:
+                # Check if the field has been accumulated by looking at the original field
+                is_accumulated = True
+                
+                # If it's a numeric type, format with comma for thousands
+                value_str = f"{value:,}"
+            elif isinstance(value, list):
+                # Format lists with limited display
+                value_str = ", ".join(str(item) for item in value[:3])
+                if len(value) > 3:
+                    value_str += f"... ({len(value)} items)"
+            elif isinstance(value, dict):
+                # Format dictionaries with summary
+                value_str = f"{{...}} ({len(value)} key-value pairs)"
+            else:
+                # Format strings and other types
+                value_str = str(value)
+            
+            # Add the prefix to the field name
+            display_name = f"Sum of {name}" if is_accumulated else f"Last {name}"
+            
+            # Set the field name with appropriate prefix
+            self.results_table.setItem(i, 0, QTableWidgetItem(display_name))
+            
+            # Set the value
+            self.results_table.setItem(i, 1, QTableWidgetItem(value_str))
+            
+            # Add description if available
+            if data.get('description'):
+                self.results_table.setItem(i, 2, QTableWidgetItem(str(data['description'])))
+            
+            print(f">   Added row {i}: {display_name} = {value_str}")
+        
+        # Resize rows to contents
+        self.results_table.resizeRowsToContents()
+        
+        # Resize the first column to contents to make room for the prefixes
+        self.results_table.resizeColumnToContents(0)
+        
+        print(f"> Table updated with {self.results_table.rowCount()} rows")
+        
+        # Update the "done/total" counter
+        self.update_done_total_counter()
+
+    def update_done_total_counter(self):
+        """Update the done/total counter"""
+        done = self.success_count
+        total = self.total_urls
+        
+        # Update the label with current progress
+        if self.is_scraping:
+            status = "Processing"
+        else:
+            status = "Completed"
+        
+        self.done_total_label.setText(f"{status}: {done}/{total}")
 
     def show_suspension_timer(self, seconds, reason):
         """Show a dialog with a countdown timer before resuming execution"""
@@ -595,6 +858,9 @@ class ScraperApp(DarkThemeApp):
             # Error
             self.error_count += 1
             self.add_url_to_error_tab(url, self.error_count)
+        
+        # Update the "done/total" counter
+        self.update_done_total_counter()
     
     def remove_url_from_input(self, url):
         """Remove a successfully processed URL from the input text box"""
@@ -623,6 +889,12 @@ class ScraperApp(DarkThemeApp):
         self.run_button.setText("RUN")
         self.cancel_button.setVisible(False)  # Hide cancel button
         self.cancel_button.setEnabled(True)   # Re-enable for next run
+        
+        # Re-enable the plugin dropdown
+        self.plugin_dropdown.setEnabled(True)
+        
+        # Update the counter to show "Completed"
+        self.update_done_total_counter()
         
         # Clean up the worker
         if self.worker:
