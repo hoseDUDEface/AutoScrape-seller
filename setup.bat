@@ -34,16 +34,16 @@ if %ERRORLEVEL% NEQ 0 (
 REM Install Python requirements
 echo.
 echo Installing Python requirements...
-if exist backend/requirementspy.txt (
-    python -m pip install -r backend/requirementspy.txt
+if exist Backend/requirementspy.txt (
+    python -m pip install -r Backend/requirementspy.txt
     if %ERRORLEVEL% NEQ 0 (
         echo Failed to install Python requirements.
-        echo Please check backend/requirementspy.txt and try again.
+        echo Please check Backend/requirementspy.txt and try again.
     ) else (
         echo Python requirements installed successfully!
     )
 ) else (
-    echo Warning: backend/requirementspy.txt not found.
+    echo Warning: Backend/requirementspy.txt not found.
 )
 
 REM Check if npm is installed
@@ -82,8 +82,8 @@ if %ERRORLEVEL% NEQ 0 (
 REM Install JavaScript requirements
 echo.
 echo Installing JavaScript requirements...
-if exist backend/requirementsjs.txt (
-    for /F "tokens=*" %%i in (backend/requirementsjs.txt) do (
+if exist Backend/requirementsjs.txt (
+    for /F "tokens=*" %%i in (Backend/requirementsjs.txt) do (
         echo Installing: %%i
         npm install -g %%i
         if %ERRORLEVEL% NEQ 0 (
@@ -92,7 +92,7 @@ if exist backend/requirementsjs.txt (
     )
     echo JavaScript requirements installation complete!
 ) else (
-    echo Warning: backend/requirementsjs.txt not found
+    echo Warning: Backend/requirementsjs.txt not found
 )
 
 echo.

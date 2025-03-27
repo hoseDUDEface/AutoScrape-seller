@@ -303,6 +303,36 @@ class ScraperWorker(QThread):
 
     def process_html(self, html, url, index):
         """Process HTML content that was scraped and emit appropriate status signal"""
+        import csv
+        import time
+        import os
+        
+        # CSV file handling - create the CSV file if it doesn't exist yet
+        if not hasattr(self, 'csv_filename'):
+            # Get the current unix timestamp
+            timestamp = int(time.time())
+            
+            # Get the selected plugin name
+            app = QApplication.instance()
+            plugin_name = "no_plugin"
+            for widget in app.topLevelWidgets():
+                if isinstance(widget, ScraperApp):
+                    if widget.selected_plugin != "Download HTML":
+                        plugin_name = os.path.splitext(widget.selected_plugin)[0]
+                    break
+            
+            # Create the CSV filename
+            self.csv_filename = f"{timestamp}_{plugin_name}.csv"
+            self.csv_header_written = False
+            
+            # Create output directory if it doesn't exist
+            csv_dir = "scraped_data"
+            if not os.path.exists(csv_dir):
+                os.makedirs(csv_dir)
+                
+            self.csv_path = os.path.join(csv_dir, self.csv_filename)
+            print(f"> CSV output will be saved to: {self.csv_path}")
+        
         # First determine status
         if html is None:
             # HTML is None, this is an error
@@ -351,6 +381,7 @@ class ScraperWorker(QThread):
                 import sys
                 # Import here explicitly to avoid scope issues
                 import os as os_module
+                from enum import Enum, auto
                 
                 plugins_dir = os.path.abspath("./Plugins/")
                 plugin_path = os.path.join(plugins_dir, main_window.selected_plugin)
@@ -434,6 +465,38 @@ class ScraperWorker(QThread):
                         
                         # Emit the results to the app
                         self.plugin_results.emit(parsed_results)
+                        
+                        # Write results to CSV
+                        try:
+                            # Prepare data for CSV - include URL for reference
+                            csv_row = {'url': url}
+                            
+                            # Add all fields to the row
+                            for field in parsed_results:
+                                # Convert the value to string if it's not
+                                if field.value is not None:
+                                    csv_row[field.name] = str(field.value)
+                                else:
+                                    csv_row[field.name] = ""
+                            
+                            # Get all field names for header
+                            field_names = ['url'] + [field.name for field in parsed_results]
+                            
+                            # Write to CSV file
+                            with open(self.csv_path, mode='a', newline='', encoding='utf-8') as csv_file:
+                                writer = csv.DictWriter(csv_file, fieldnames=field_names)
+                                
+                                # Write header if this is the first time
+                                if not self.csv_header_written:
+                                    writer.writeheader()
+                                    self.csv_header_written = True
+                                
+                                # Write the data row
+                                writer.writerow(csv_row)
+                            
+                            print(f"> CSV data saved to: {self.csv_path}")
+                        except Exception as csv_e:
+                            print(f"> Error saving to CSV: {str(csv_e)}")
                         
                     else:
                         print(f"> Error: Could not find plugin class in {plugin_path}")

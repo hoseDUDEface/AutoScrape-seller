@@ -172,3 +172,5 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+Backend/scraped_html
+Backend/scraped_data
