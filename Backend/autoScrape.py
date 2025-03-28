@@ -127,16 +127,18 @@ class ScraperWorker(QThread):
             
             # Footer elements
             'role="contentinfo"',
-            '<a rel="noopener noreferrer" href="https://www.cloudflare.com?utm_source=challenge'
+            '<a rel="noopener noreferrer" href="https://www.cloudflare.com?utm_source=challenge',
+
+            # Previously strong elements
+            "ray id: <code>",
+            'class="ray-id">ray id:',
+            '/cdn-cgi/challenge-platform/'
         ]
         
         # Strong indicators that, if any are present, almost certainly indicate a Cloudflare page
         strong_indicators = [
-            "/cdn-cgi/challenge-platform/",
             "window._cf_chl_opt",
             "cloudflare.com?utm_source=challenge",
-            "ray id: <code>",
-            'class="ray-id">ray id:',
             "challenge-platform/h/b/orchestrate/chl_page"
         ]
         

@@ -29,6 +29,10 @@ def setup_chrome_options(headless=False, user_agent=None):
     # Basic settings
     if headless:
         options.add_argument("--headless=new")
+        options.add_argument("--headless")
+        options.headless = True
+    else :
+         options.headless = False
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--no-sandbox")
@@ -173,18 +177,62 @@ def create_driver_stealth(headless=False):
     return driver
 
 def create_driver_seleniumbase(headless=False):
-    """Create a SeleniumBase driver"""
-    user_agents = load_user_agents()
-    user_agent = random.choice(user_agents)
-    options = setup_chrome_options(headless, user_agent)
-    
+    """Create a SeleniumBase driver with better Cloudflare bypass capabilities"""
+    # Note: SeleniumBase's Driver handles many settings internally when uc=True
     try:
-        return Driver(uc=True, incognito=True, options=options)
+        # For best Cloudflare bypass, use uc=True for undetected-chromedriver features
+        # headless=False is strongly recommended for Cloudflare bypass
+        return Driver(uc=True, incognito=True, headless=headless)
     except Exception as e:
         print(f"Error creating SeleniumBase driver: {str(e)}")
         # Fallback to undetected_chromedriver
         print("Falling back to undetected_chromedriver...")
         return create_driver_undetected(headless)
+
+def bypass_cloudflare_with_seleniumbase(url, headless=False, reconnect_time=6):
+    """
+    Use SeleniumBase's specialized methods to bypass Cloudflare protection
+    
+    Args:
+        url: URL to scrape
+        headless: Whether to run in headless mode (not recommended for Cloudflare bypass)
+        reconnect_time: Time to reconnect, giving browser time to handle JS challenge
+        
+    Returns:
+        Tuple of (HTML source, driver) or (None, driver) if failed
+    """
+    driver = None
+    try:
+        # Create the SeleniumBase driver - recommend GUI mode for Cloudflare
+        driver = Driver(uc=True, headless=headless)
+        print(f"Created SeleniumBase driver with UC mode enabled")
+        
+        # Use the specialized method for opening with reconnect time
+        print(f"Opening {url} with reconnect time of {reconnect_time} seconds")
+        driver.uc_open_with_reconnect(url, reconnect_time=reconnect_time)
+        
+        # Try to click the CAPTCHA checkbox if it appears
+        # Note: This only works in GUI mode (non-headless)
+        if not headless:
+            try:
+                print("Attempting to click CAPTCHA checkbox if present")
+                driver.uc_gui_click_captcha()
+            except Exception as e:
+                print(f"No CAPTCHA found or error clicking it: {str(e)}")
+        
+        # Check if we successfully bypassed Cloudflare
+        if is_cloudflare_detected(driver):
+            print("Failed to bypass Cloudflare challenge")
+            return None, driver
+        
+        # Successfully bypassed - return the HTML
+        html_source = driver.page_source
+        print("Successfully obtained page content after Cloudflare")
+        return html_source, driver
+        
+    except Exception as e:
+        print(f"Error during Cloudflare bypass: {str(e)}")
+        return None, driver
 
 def get_html_with_driver(driver, url, headless=False, human_behavior=True, behavior_intensity="medium"):
     """Fetch HTML source from a website with the given driver"""
@@ -210,12 +258,14 @@ def get_html_with_driver(driver, url, headless=False, human_behavior=True, behav
         return html_source, driver
     except Exception as e:
         print(f"Error during scraping: {str(e)}")
-        driver.quit()
+        if driver:
+            driver.quit()
         return None, None
 
-def getHtmlAdvanced(url, method="undetected", headless=False, human_behavior=True, behavior_intensity="medium", auto_close_driver=True):
+def getHtmlAdvanced(url, method="seleniumbase", headless=False, human_behavior=True, 
+                    behavior_intensity="medium", auto_close_driver=True, reconnect_time=6):
     """
-    Extract HTML source using the specified method, returns None if Cloudflare is detected
+    Extract HTML source using the specified method, with improved Cloudflare bypass
     
     Args:
         url: URL to scrape
@@ -224,12 +274,24 @@ def getHtmlAdvanced(url, method="undetected", headless=False, human_behavior=Tru
         human_behavior: Whether to simulate human behavior
         behavior_intensity: Intensity of human behavior (low, medium, high)
         auto_close_driver: Whether to automatically close the driver after scraping
+        reconnect_time: For seleniumbase method, time to reconnect for JS challenge
         
     Returns:
-        HTML source (or None if Cloudflare is detected)
+        HTML source (or None if Cloudflare is detected and not bypassed)
     """
     driver = None
     try:
+        # If using SeleniumBase with its specialized Cloudflare bypass methods
+        if method == "seleniumbase":
+            print("Using SeleniumBase with specialized Cloudflare bypass methods")
+            html, driver = bypass_cloudflare_with_seleniumbase(url, headless, reconnect_time)
+            if html:
+                print("Successfully bypassed Cloudflare using SeleniumBase specialized methods")
+                return html
+            else:
+                print("SeleniumBase specialized methods failed to bypass Cloudflare")
+                # Fall through to try standard approach
+        
         # Create the appropriate driver based on method
         if method == "undetected":
             driver = create_driver_undetected(headless)
@@ -238,8 +300,9 @@ def getHtmlAdvanced(url, method="undetected", headless=False, human_behavior=Tru
             driver = create_driver_stealth(headless)
             method_name = "Stealth mode"
         elif method == "seleniumbase":
+            # This would be a fallback if the specialized method failed
             driver = create_driver_seleniumbase(headless)
-            method_name = "SeleniumBase"
+            method_name = "SeleniumBase (standard approach)"
         else:  # standard
             driver = create_driver_standard(headless)
             method_name = "Standard Selenium"
@@ -262,6 +325,7 @@ def getHtmlAdvanced(url, method="undetected", headless=False, human_behavior=Tru
         
         # No Cloudflare detected or it was bypassed successfully
         html_source = driver.page_source
+        print("Successfully obtained page content")
         return html_source
         
     except Exception as e:
@@ -275,3 +339,79 @@ def getHtmlAdvanced(url, method="undetected", headless=False, human_behavior=Tru
                 print("Driver closed")
             except Exception as e:
                 print(f"Error closing driver: {str(e)}")
+
+def interact_with_captcha(driver):
+    """
+    Attempt to identify and solve a CAPTCHA if present.
+    Supports multiple CAPTCHA types including Cloudflare's checkbox challenge.
+    """
+    try:
+        # Try SeleniumBase's built-in CAPTCHA clicker if available
+        if hasattr(driver, 'uc_gui_click_captcha'):
+            print("Using SeleniumBase's built-in CAPTCHA clicker")
+            driver.uc_gui_click_captcha()
+            return True
+            
+        # Look for common CAPTCHA elements
+        # Cloudflare checkbox
+        cf_checkbox = driver.find_elements(By.CSS_SELECTOR, 
+                                         "input[type='checkbox'], .recaptcha-checkbox")
+        
+        if cf_checkbox:
+            for checkbox in cf_checkbox:
+                if checkbox.is_displayed() and checkbox.is_enabled():
+                    print("Found CAPTCHA checkbox, attempting to click")
+                    checkbox.click()
+                    time.sleep(2)  # Wait for any animations or verifications
+                    return True
+        
+        # Look for iframe-based CAPTCHAs (like reCAPTCHA)
+        captcha_frames = driver.find_elements(By.CSS_SELECTOR, 
+                                            "iframe[src*='recaptcha'], iframe[src*='captcha']")
+        
+        if captcha_frames:
+            print("Found CAPTCHA iframe, attempting to switch and interact")
+            for frame in captcha_frames:
+                if frame.is_displayed():
+                    # Switch to the frame
+                    driver.switch_to.frame(frame)
+                    
+                    # Look for checkbox inside frame
+                    checkbox = driver.find_elements(By.CSS_SELECTOR, 
+                                                 ".recaptcha-checkbox-border")
+                    if checkbox:
+                        for cb in checkbox:
+                            if cb.is_displayed() and cb.is_enabled():
+                                cb.click()
+                                time.sleep(2)
+                                driver.switch_to.default_content()
+                                return True
+                    
+                    # Switch back to main content
+                    driver.switch_to.default_content()
+        
+        print("No CAPTCHA elements identified or interaction failed")
+        return False
+        
+    except Exception as e:
+        print(f"Error during CAPTCHA interaction: {str(e)}")
+        return False
+        
+# Example usage
+if __name__ == "__main__":
+    # Example 1: Using the improved SeleniumBase method
+    url = "https://example.com"  # Replace with your target URL
+    
+    print("Testing SeleniumBase with Cloudflare bypass...")
+    html = getHtmlAdvanced(
+        url=url, 
+        method="seleniumbase",
+        headless=False,  # Recommend False for Cloudflare bypass
+        reconnect_time=6
+    )
+    
+    if html:
+        print("Successfully retrieved HTML content")
+        print(f"HTML length: {len(html)} characters")
+    else:
+        print("Failed to retrieve HTML content")

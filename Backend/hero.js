@@ -310,7 +310,7 @@ async function fetchWithHero(url, config) {
     
     // Create a new Hero instance with advanced settings
     hero = new Hero({
-      headless: config.headless,
+      showChrome: config.headless === false, // Show browser window when headless is false
       blockedResourceTypes: config.blockedResourceTypes,
       viewport: config.viewport,
       userAgent: `~ ${/chrome/i.test(config.userAgent) ? 'chrome' : 'safari'} >= 110`,
@@ -494,7 +494,7 @@ async function fetchWithPuppeteer(url, config) {
     
     // Launch browser with additional arguments to avoid detection
     browser = await puppeteer.launch({
-      headless: config.headless,
+      headless: config.headless === false ? false : "new",
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -632,7 +632,7 @@ async function fetchWithPuppeteerExtra(url, config, useStealthPlugin) {
     
     // Launch browser with additional arguments to avoid detection
     browser = await puppeteerExtra.launch({
-      headless: config.headless,
+      headless: config.headless === false ? false : "new",
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
