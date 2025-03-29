@@ -610,25 +610,116 @@ async function fetchWithPuppeteerExtra(url, config, useStealthPlugin) {
     throw new Error('puppeteer is required but not installed. Please run: npm install puppeteer');
   }
   
-  // Add stealth plugin if requested
-  if (useStealthPlugin) {
-    stealthPlugin = stealthPlugin || safeRequire('puppeteer-extra-plugin-stealth');
-    if (stealthPlugin) {
-      puppeteerExtra.use(stealthPlugin());
-      console.error('Using stealth plugin');
-    } else {
-      console.error('Stealth plugin requested but not installed. Continuing without it.');
-      console.error('To install, run: npm install puppeteer-extra-plugin-stealth');
-    }
+  // Add stealth plugin by default
+  stealthPlugin = stealthPlugin || safeRequire('puppeteer-extra-plugin-stealth');
+  if (stealthPlugin) {
+    puppeteerExtra.use(stealthPlugin());
+    console.error('Using stealth plugin');
+  } else {
+    console.error('Stealth plugin not installed. Continuing without it.');
+    console.error('To install, run: npm install puppeteer-extra-plugin-stealth');
   }
   
-  // We'll skip loading the other plugins if they're not available
-  // and continue with basic anti-detection measures
+  // Add additional plugins if stealth mode is explicitly requested
+  if (useStealthPlugin) {
+    console.error('Enhanced stealth mode enabled, loading additional plugins...');
+    
+    // Anonymize user agent
+    const anonymizeUAPlugin = safeRequire('puppeteer-extra-plugin-anonymize-ua');
+    if (anonymizeUAPlugin) {
+      puppeteerExtra.use(anonymizeUAPlugin());
+      console.error('Using anonymize-ua plugin');
+    } else {
+      console.error('anonymize-ua plugin not installed');
+    }
+
+    // Block unnecessary resources
+    const blockResourcesPlugin = safeRequire('puppeteer-extra-plugin-block-resources');
+    if (blockResourcesPlugin) {
+      puppeteerExtra.use(blockResourcesPlugin({
+        blockedTypes: new Set(['font', 'media'])
+      }));
+      console.error('Using block-resources plugin');
+    } else {
+      console.error('block-resources plugin not installed');
+    }
+
+    // User preferences
+    const userPreferencesPlugin = safeRequire('puppeteer-extra-plugin-user-preferences');
+    if (userPreferencesPlugin) {
+      puppeteerExtra.use(userPreferencesPlugin({
+        userPrefs: {
+          webkit: {
+            webprefs: {
+              default_font_size: 16
+            }
+          }
+        }
+      }));
+      console.error('Using user-preferences plugin');
+    } else {
+      console.error('user-preferences plugin not installed');
+    }
+
+    // User data directory
+    const userDataDirPlugin = safeRequire('puppeteer-extra-plugin-user-data-dir');
+    if (userDataDirPlugin) {
+      puppeteerExtra.use(userDataDirPlugin());
+      console.error('Using user-data-dir plugin');
+    } else {
+      console.error('user-data-dir plugin not installed');
+    }
+
+    // Font size consistency
+    const fontSizePlugin = safeRequire('puppeteer-extra-plugin-font-size');
+    if (fontSizePlugin) {
+      puppeteerExtra.use(fontSizePlugin());
+      console.error('Using font-size plugin');
+    } else {
+      console.error('font-size plugin not installed');
+    }
+
+    // Human-like clicking
+    const clickAndWaitPlugin = safeRequire('puppeteer-extra-plugin-click-and-wait');
+    if (clickAndWaitPlugin) {
+      puppeteerExtra.use(clickAndWaitPlugin());
+      console.error('Using click-and-wait plugin');
+    } else {
+      console.error('click-and-wait plugin not installed');
+    }
+
+    // Proxy support if configured
+    if (config.proxy) {
+      const proxyPlugin = safeRequire('puppeteer-extra-plugin-proxy');
+      if (proxyPlugin) {
+        puppeteerExtra.use(proxyPlugin({
+          address: config.proxy.address,
+          port: config.proxy.port,
+          credentials: config.proxy.credentials
+        }));
+        console.error('Using proxy plugin');
+      } else {
+        console.error('proxy plugin not installed');
+      }
+    }
+
+    // Random user agent rotation
+    const randomUserAgentPlugin = safeRequire('puppeteer-extra-plugin-random-user-agent');
+    if (randomUserAgentPlugin) {
+      puppeteerExtra.use(randomUserAgentPlugin());
+      console.error('Using random-user-agent plugin');
+    } else {
+      console.error('random-user-agent plugin not installed');
+    }
+    
+    console.error('All available stealth plugins loaded');
+    console.error('To install missing plugins, run: npm install puppeteer-extra-plugin-stealth puppeteer-extra-plugin-anonymize-ua puppeteer-extra-plugin-block-resources puppeteer-extra-plugin-user-preferences puppeteer-extra-plugin-user-data-dir puppeteer-extra-plugin-font-size puppeteer-extra-plugin-click-and-wait puppeteer-extra-plugin-proxy puppeteer-extra-plugin-random-user-agent');
+  }
   
   let browser = null;
   
   try {
-    console.error(`Launching Puppeteer-Extra${useStealthPlugin ? ' with Stealth' : ''} with enhanced settings...`);
+    console.error(`Launching Puppeteer-Extra${useStealthPlugin ? ' with Enhanced Stealth' : ' with Basic Stealth'} with enhanced settings...`);
     
     // Launch browser with additional arguments to avoid detection
     browser = await puppeteerExtra.launch({
@@ -699,11 +790,11 @@ async function fetchWithPuppeteerExtra(url, config, useStealthPlugin) {
     // Get the HTML content
     const html = await page.content();
     
-    console.error(`Successfully fetched HTML with Puppeteer${useStealthPlugin ? ' + Stealth' : ' Extra'} (${html.length} characters)`);
+    console.error(`Successfully fetched HTML with Puppeteer${useStealthPlugin ? ' + Enhanced Stealth' : ' + Basic Stealth'} (${html.length} characters)`);
     return html;
     
   } catch (error) {
-    console.error(`Error fetching HTML with Puppeteer${useStealthPlugin ? ' + Stealth' : ' Extra'}: ${error.message}`);
+    console.error(`Error fetching HTML with Puppeteer${useStealthPlugin ? ' + Enhanced Stealth' : ' + Basic Stealth'}: ${error.message}`);
     
     // Take error screenshot if debug enabled
     if (config.debugScreenshots && browser) {
