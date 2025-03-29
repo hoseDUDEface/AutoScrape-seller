@@ -6,6 +6,7 @@ An automated scraper of a list of urls, with 10 different scraping technologies,
 This project was made using the infamous method of **vibe coding**, using Claude 3.7 . I understand most of it, but the javascript using [Ulixee Hero](https://github.com/ulixee/hero) is not something i'm comfortable with. I highly encourage anyone who wants to modify it to do so. If anyone wants to fork it and update it regularly, be my guest, and I'll reference you there.   
 This software was tested on windows, and the behavior is currently unknown in any other OS. 
 
+## Software View
 ![image](https://github.com/user-attachments/assets/e77b06cf-c25f-49b1-a464-149fa0b7fa2d)
 
 
