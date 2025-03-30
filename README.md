@@ -1,14 +1,32 @@
-# AutoScrape
 
-An automated scraper of a list of urls, with 10 different scraping technologies, and custom parsers as plugins in pythons.
 
+![autoscrape](https://github.com/user-attachments/assets/89937604-8c96-40f0-af4f-c34996a31e40)
+<p align="center" style="font-size: 28px;">
+  Scrape a list of urls with 10 different technologies, automatically, and parse the results with your own custom plugin.
+</p>
+  
 ## Disclaimer
-This project was made using the infamous method of **vibe coding**, using Claude 3.7 . I understand most of it, but the javascript using [Ulixee Hero](https://github.com/ulixee/hero) is not something i'm comfortable with. I highly encourage anyone who wants to modify it to do so. If anyone wants to fork it and update it regularly, be my guest, and I'll reference you there.   
-This software was tested on windows, and the behavior is currently unknown in any other OS. 
+
+<details>
+<summary>About this project</summary>
+
+This project was made using the infamous method of **vibe coding**, using Claude 3.7. I understand most of it, but the javascript using [Ulixee Hero](https://github.com/ulixee/hero) is not something i'm comfortable with. I highly encourage anyone who wants to modify it to do so. If anyone wants to fork it and update it regularly, be my guest, and I'll reference you there.
+</details>
+
+<details>
+<summary>About testing environment</summary>
+
+All testing was performed on Windows 11 with Python 3.12.4 and the latest versions of supported browsers. Performance and compatibility with other operating systems cannot be guaranteed. Users on Linux or MacOS may need to modify certain components to achieve functionality.
+</details>
+
+<details>
+<summary>About liability</summary>
+
+This software is provided for personal use in a protected environment only. I cannot and will not be held responsible for any misuse, illegal use, or any damages that may occur from using this software. Users are solely responsible for ensuring they comply with all applicable laws, terms of service, and policies when using this tool. By downloading or using this software, you acknowledge that you assume all risks associated with its use.
+</details>
 
 ## Software View
-![image](https://github.com/user-attachments/assets/e77b06cf-c25f-49b1-a464-149fa0b7fa2d)
-
+![image](https://github.com/user-attachments/assets/167de176-eb6a-43ad-815c-53b39289b95b)
 
 ## Setup
 Run the script setup.bat to :
@@ -352,3 +370,6 @@ Once you've created your plugin:
 4. When scraping a website, your plugin will process the HTML and save structured data
 
 The extracted data from plugins is saved in the `Backend/scraped_data/` directory in CSV format.
+
+## Why the cat
+Isn't she adorable ?
