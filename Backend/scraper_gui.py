@@ -480,7 +480,7 @@ class DarkThemeApp(QMainWindow):
         self.update_intensity_buttons()
     
     def create_run_button(self):
-        # Create horizontal layout for run button and timeout
+        # Create run button on its own row (full width)
         run_layout = QHBoxLayout()
         
         # Create cancel button (initially hidden)
@@ -489,18 +489,42 @@ class DarkThemeApp(QMainWindow):
         self.cancel_button.setCursor(Qt.PointingHandCursor)
         self.cancel_button.clicked.connect(self.cancel_scraping)
         self.cancel_button.setVisible(False)  # Initially hidden
-        run_layout.addWidget(self.cancel_button, 1)  # Add stretch factor of 1
+        run_layout.addWidget(self.cancel_button)
         
         # Create run button
         self.run_button = QPushButton("RUN")
         self.run_button.setObjectName("run_button")
         self.run_button.setCursor(Qt.PointingHandCursor)
         self.run_button.clicked.connect(self.run_action)
-        run_layout.addWidget(self.run_button, 1)  # Add stretch factor of 1
+        run_layout.addWidget(self.run_button)
+        
+        # Add run layout to main layout (full row)
+        self.main_layout.addLayout(run_layout)
+        
+        # Create a separate row for output file and timeout
+        output_timeout_layout = QHBoxLayout()
+        
+        # Create output file input field
+        output_file_layout = QHBoxLayout()
+        output_file_label = QLabel("Output File:")
+        output_file_layout.addWidget(output_file_label)
+        
+        self.output_file_input = QLineEdit()
+        output_file_layout.addWidget(self.output_file_input)
+        
+        # Create browse button
+        self.open_output_button = QPushButton("...")
+        self.open_output_button.setFixedWidth(30)
+        self.open_output_button.setCursor(Qt.PointingHandCursor)
+        self.open_output_button.clicked.connect(self.open_output_dialog)
+        output_file_layout.addWidget(self.open_output_button)
+        
+        # Add output file section to the row with stretch
+        output_timeout_layout.addLayout(output_file_layout, 1)  # Add stretch factor of 1
         
         # Create a container widget for timeout controls with fixed width
         timeout_widget = QWidget()
-        timeout_widget.setFixedWidth(160)  # Fixed width of 80px
+        timeout_widget.setFixedWidth(160)  # Fixed width of 160px
         timeout_layout = QHBoxLayout(timeout_widget)
         timeout_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
         
@@ -517,11 +541,11 @@ class DarkThemeApp(QMainWindow):
         self.timeout_value.setSingleStep(1)
         timeout_layout.addWidget(self.timeout_value)
         
-        # Add timeout widget to main layout (no stretch)
-        run_layout.addWidget(timeout_widget, 0)  # No stretch
+        # Add timeout widget to output/timeout layout (no stretch)
+        output_timeout_layout.addWidget(timeout_widget, 0)  # No stretch
         
-        # Add to main layout
-        self.main_layout.addLayout(run_layout)
+        # Add output/timeout layout to main layout
+        self.main_layout.addLayout(output_timeout_layout)
 
     def create_split_view(self):
         # Create horizontal layout for split view
@@ -846,9 +870,41 @@ class DarkThemeApp(QMainWindow):
                 if intensity_buttons:
                     self.select_button("Behavior Intensity", intensity_buttons[0].text())
     
+    def open_output_dialog(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog  # Force Qt's dialog
+        
+        # Fix: Properly format filter with multiple options
+        file_filter = "CSV Files (*.csv)"
+        
+        file_path, selected_filter = QFileDialog.getSaveFileName(  # Changed to getSaveFileName
+            self, 
+            "Select or Create File", 
+            "", 
+            file_filter,
+            "CSV Files (*.csv)",  # Set default selected filter
+            options=options
+        )
+        if file_path:
+            # Ensure the file has .csv extension
+            if not file_path.lower().endswith('.csv'):
+                file_path += '.csv'
+            self.output_file_input.setText(file_path)
+
     def browse_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select File", "", "All Files (*)"
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog  # Force Qt's dialog
+        
+        # Fix: Properly format filter with multiple options
+        file_filter = "All Files (*);;Text Files (*.txt);;CSV Files (*.csv)"
+        
+        file_path, selected_filter = QFileDialog.getOpenFileName(
+            self, 
+            "Select File", 
+            "", 
+            file_filter,
+            "All Files (*)",  # Set default selected filter
+            options=options
         )
         if file_path:
             self.file_path_input.setText(file_path)

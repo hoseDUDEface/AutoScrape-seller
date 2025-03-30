@@ -16,13 +16,14 @@ class ScraperWorker(QThread):
     suspend_execution = pyqtSignal(int, str)  # Signal to suspend execution with timeout and reason
     plugin_results = pyqtSignal(list)  # Signal to send plugin results to the app
     
-    def __init__(self, options, urls, timeout_value):
+    def __init__(self, options, urls, timeout_value, output_file=None):
         super().__init__()
         self.options = options
         self.urls = urls
         self.stop_execution = False    # Flag to stop execution completely
         self.is_suspended = False      # Flag to suspend execution temporarily
         self.timeout_seconds = timeout_value  # Timeout value in seconds
+        self.custom_output_file = output_file
         
     def run(self):
         """Main execution method for the worker thread"""
@@ -308,63 +309,90 @@ class ScraperWorker(QThread):
         import csv
         import time
         import os
-        
-        # CSV file handling - create the CSV file if it doesn't exist yet
+            
+        # In ScraperWorker.process_html method, change this part:
         if not hasattr(self, 'csv_filename'):
             # Get the current unix timestamp
             timestamp = int(time.time())
             
-            # Get the selected plugin name
-            app = QApplication.instance()
-            plugin_name = "no_plugin"
-            for widget in app.topLevelWidgets():
-                if isinstance(widget, ScraperApp):
-                    if widget.selected_plugin != "Download HTML":
-                        plugin_name = os.path.splitext(widget.selected_plugin)[0]
-                    break
+            # Initialize csv_filename (even if using custom path, to avoid attribute errors)
+            self.csv_filename = None
             
-            # Create the CSV filename
-            self.csv_filename = f"{timestamp}_{plugin_name}.csv"
-            self.csv_header_written = False
+            # Check if we have a custom output file
+            if self.custom_output_file and self.custom_output_file.strip():
+                try:
+                    # Use the custom output file
+                    self.csv_path = self.custom_output_file.strip()
+                    
+                    # Ensure the directory exists
+                    output_dir = os.path.dirname(self.csv_path)
+                    if output_dir and not os.path.exists(output_dir):
+                        os.makedirs(output_dir)
+                        print(f"> Created directory: {output_dir}")
+                        
+                    print(f"> CSV output will be saved to custom path: {self.csv_path}")
+                    
+                    # Check if the file already exists to determine if we need to write headers
+                    self.csv_header_written = os.path.exists(self.csv_path) and os.path.getsize(self.csv_path) > 0
+                except Exception as e:
+                    print(f"> Error setting up custom output file: {str(e)}")
+                    print("> Falling back to default output file")
+                    # Fall back to default file path
+                    self.custom_output_file = None
             
-            # Create output directory if it doesn't exist
-            csv_dir = "scraped_data"
-            if not os.path.exists(csv_dir):
-                os.makedirs(csv_dir)
+            # If no custom output file or an error occurred, use the default path
+            if not hasattr(self, 'csv_path'):
+                # Get the selected plugin name
+                app = QApplication.instance()
+                plugin_name = "no_plugin"
+                for widget in app.topLevelWidgets():
+                    if isinstance(widget, ScraperApp):
+                        if widget.selected_plugin != "Download HTML":
+                            plugin_name = os.path.splitext(widget.selected_plugin)[0]
+                        break
                 
-            self.csv_path = os.path.join(csv_dir, self.csv_filename)
-            print(f"> CSV output will be saved to: {self.csv_path}")
-        
-        # First determine status
-        if html is None:
-            # HTML is None, this is an error
-            print(f"> Error: No HTML content retrieved for {url}")
-            self.url_status.emit(2, url)
-            # Suspend execution on error
-            self.suspend_execution.emit(self.timeout_seconds, "Error: Failed to retrieve content")
-            self.is_suspended = True
-            return
-            
-        # Check if this is a Cloudflare page
-        if self.is_cloudflare_detection_page(html):
-            print(f"> Cloudflare detection page found for {url}")
-            self.url_status.emit(1, url)
-            # Suspend execution on warning
-            self.suspend_execution.emit(self.timeout_seconds, "Warning: Cloudflare protection detected")
-            self.is_suspended = True
-            return
-        
-        # Check for HTTP 429 response
-        if "HTTP ERROR 429" in html or "Too Many Requests" in html:
-            print(f"> HTTP 429 Too Many Requests error for {url}")
-            self.url_status.emit(1, url)  # Using warning status for rate limiting
-            # Suspend execution to prevent further rate limiting
-            self.suspend_execution.emit(self.timeout_seconds, "Warning: Rate limit (HTTP 429) detected")
-            self.is_suspended = True
-            return
+                # Create the CSV filename
+                self.csv_filename = f"{timestamp}_{plugin_name}.csv"
+                self.csv_header_written = False
                 
-        # If we got here, it's a successful retrieval
-        print(f"> Success! Retrieved {len(html)} characters of HTML")
+                # Create output directory if it doesn't exist
+                csv_dir = "scraped_data"
+                if not os.path.exists(csv_dir):
+                    os.makedirs(csv_dir)
+                    
+                self.csv_path = os.path.join(csv_dir, self.csv_filename)
+                print(f"> CSV output will be saved to: {self.csv_path}")
+                
+                # First determine status
+                if html is None:
+                    # HTML is None, this is an error
+                    print(f"> Error: No HTML content retrieved for {url}")
+                    self.url_status.emit(2, url)
+                    # Suspend execution on error
+                    self.suspend_execution.emit(self.timeout_seconds, "Error: Failed to retrieve content")
+                    self.is_suspended = True
+                    return
+                    
+                # Check if this is a Cloudflare page
+                if self.is_cloudflare_detection_page(html):
+                    print(f"> Cloudflare detection page found for {url}")
+                    self.url_status.emit(1, url)
+                    # Suspend execution on warning
+                    self.suspend_execution.emit(self.timeout_seconds, "Warning: Cloudflare protection detected")
+                    self.is_suspended = True
+                    return
+                
+                # Check for HTTP 429 response
+                if "HTTP ERROR 429" in html or "Too Many Requests" in html:
+                    print(f"> HTTP 429 Too Many Requests error for {url}")
+                    self.url_status.emit(1, url)  # Using warning status for rate limiting
+                    # Suspend execution to prevent further rate limiting
+                    self.suspend_execution.emit(self.timeout_seconds, "Warning: Rate limit (HTTP 429) detected")
+                    self.is_suspended = True
+                    return
+                        
+                # If we got here, it's a successful retrieval
+                print(f"> Success! Retrieved {len(html)} characters of HTML")
         
         # Apply the selected plugin if not in "Download HTML" mode
         app = QApplication.instance()
@@ -572,6 +600,8 @@ class ScraperApp(DarkThemeApp):
         # Run button
         self.run_button.clicked.disconnect()  # Disconnect any previous connections
         self.run_button.clicked.connect(self.run_scraper)
+
+        
         # every other button is a good looking radio button grid
         
 
@@ -650,8 +680,11 @@ class ScraperApp(DarkThemeApp):
         # Get timeout value from the spinbox
         timeout_seconds = self.timeout_value.value()
         
+        # Get output file path from the text field
+        output_file = self.output_file_input.text().strip()
+
         # Create and configure the worker
-        self.worker = ScraperWorker(options, urls, timeout_seconds)
+        self.worker = ScraperWorker(options, urls, timeout_seconds, output_file)
         
         # Connect signals
         self.worker.url_status.connect(self.handle_url_status)
