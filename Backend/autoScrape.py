@@ -129,28 +129,23 @@ class ScraperWorker(QThread):
             # Footer elements
             'role="contentinfo"',
             '<a rel="noopener noreferrer" href="https://www.cloudflare.com?utm_source=challenge',
-
-            # Previously strong elements
-            "ray id: <code>",
-            'class="ray-id">ray id:',
-            '/cdn-cgi/challenge-platform/'
         ]
         
         # Strong indicators that, if any are present, almost certainly indicate a Cloudflare page
         strong_indicators = [
+            "ray id: <code>",
+            'class="ray-id">ray id:',
+            '/cdn-cgi/challenge-platform/',
             "window._cf_chl_opt",
             "cloudflare.com?utm_source=challenge",
             "challenge-platform/h/b/orchestrate/chl_page"
         ]
         
         # Check if any strong indicators are present
-        for indicator in strong_indicators:
-            if indicator in html_lower:
-                print(f"Strong Cloudflare indicator found: {indicator}")
-                return True
         
         # Count how many general indicators are found
         indicators_found = sum(1 for indicator in cloudflare_indicators if indicator in html_lower)
+        indicators_found += sum(2 for indicator in strong_indicators if indicator in html_lower)
         
         # We require a higher threshold for confidence (65% of indicators)
         threshold = int(len(cloudflare_indicators) * 0.65)
@@ -309,6 +304,9 @@ class ScraperWorker(QThread):
         import csv
         import time
         import os
+        
+        # Status tracking variable
+        status_code = 0  # Default to success
             
         # In ScraperWorker.process_html method, change this part:
         if not hasattr(self, 'csv_filename'):
@@ -363,36 +361,39 @@ class ScraperWorker(QThread):
                 self.csv_path = os.path.join(csv_dir, self.csv_filename)
                 print(f"> CSV output will be saved to: {self.csv_path}")
                 
-                # First determine status
-                if html is None:
-                    # HTML is None, this is an error
-                    print(f"> Error: No HTML content retrieved for {url}")
-                    self.url_status.emit(2, url)
-                    # Suspend execution on error
-                    self.suspend_execution.emit(self.timeout_seconds, "Error: Failed to retrieve content")
-                    self.is_suspended = True
-                    return
-                    
-                # Check if this is a Cloudflare page
-                if self.is_cloudflare_detection_page(html):
-                    print(f"> Cloudflare detection page found for {url}")
-                    self.url_status.emit(1, url)
-                    # Suspend execution on warning
-                    self.suspend_execution.emit(self.timeout_seconds, "Warning: Cloudflare protection detected")
-                    self.is_suspended = True
-                    return
+        # First determine status
+        if html is None:
+            # HTML is None, this is an error
+            print(f"> Error: No HTML content retrieved for {url}")
+            self.url_status.emit(2, url)
+            # Suspend execution on error
+            self.suspend_execution.emit(self.timeout_seconds, "Error: Failed to retrieve content")
+            self.is_suspended = True
+            status_code = 2  # Error
+            return
                 
-                # Check for HTTP 429 response
-                if "HTTP ERROR 429" in html or "Too Many Requests" in html:
-                    print(f"> HTTP 429 Too Many Requests error for {url}")
-                    self.url_status.emit(1, url)  # Using warning status for rate limiting
-                    # Suspend execution to prevent further rate limiting
-                    self.suspend_execution.emit(self.timeout_seconds, "Warning: Rate limit (HTTP 429) detected")
-                    self.is_suspended = True
-                    return
-                        
-                # If we got here, it's a successful retrieval
-                print(f"> Success! Retrieved {len(html)} characters of HTML")
+        # Check if this is a Cloudflare page
+        if self.is_cloudflare_detection_page(html):
+            print(f"> Cloudflare detection page found for {url}")
+            self.url_status.emit(1, url)
+            # Suspend execution on warning
+            self.suspend_execution.emit(self.timeout_seconds, "Warning: Cloudflare protection detected")
+            self.is_suspended = True
+            status_code = 1  # Warning
+            return
+        
+        # Check for HTTP 429 response
+        if "HTTP ERROR 429" in html or "Too Many Requests" in html:
+            print(f"> HTTP 429 Too Many Requests error for {url}")
+            self.url_status.emit(1, url)  # Using warning status for rate limiting
+            # Suspend execution to prevent further rate limiting
+            self.suspend_execution.emit(self.timeout_seconds, "Warning: Rate limit (HTTP 429) detected")
+            self.is_suspended = True
+            status_code = 1  # Warning
+            return
+                
+        # If we got here, it's a successful retrieval
+        print(f"> Success! Retrieved {len(html)} characters of HTML")
         
         # Apply the selected plugin if not in "Download HTML" mode
         app = QApplication.instance()
@@ -563,9 +564,12 @@ class ScraperWorker(QThread):
             
             # Emit success signal
             self.url_status.emit(0, url)
+            status_code = 0  # Success
             
-            # Signal to remove this URL from the input
-            self.remove_url.emit(url)
+            # Signal to remove this URL from the input ONLY if it was successful
+            # This is the key change - only remove on success (status_code == 0)
+            if status_code == 0:
+                self.remove_url.emit(url)
             
         except Exception as e:
             print(f"> Error saving HTML: {str(e)}")
@@ -642,11 +646,6 @@ class ScraperApp(DarkThemeApp):
         # Check if already running
         if self.is_scraping:
             return
-            
-        # Reset counters for a new run
-        self.success_count = 0
-        self.warning_count = 0
-        self.error_count = 0
         
         # Clear accumulated results for a new run
         self.accumulated_results = {}

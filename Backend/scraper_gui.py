@@ -668,11 +668,11 @@ class DarkThemeApp(QMainWindow):
         label.setFixedHeight(18)  # Set fixed height
         label.setWordWrap(False)  # Prevent word wrapping
         label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # Align text properly
-        self.in_layout.addWidget(label)
         if num == 0:
             self.tab_widget.setTabText(0, "Done")
         else:
             self.tab_widget.setTabText(0, "Done "+str(num))
+        self.in_layout.addWidget(label)
 
     def add_url_to_warning_tab(self, url, num=0):
         """Add a URL to the Warning tab (yellow)"""
@@ -681,11 +681,11 @@ class DarkThemeApp(QMainWindow):
         label.setFixedHeight(18)  # Set fixed height
         label.setWordWrap(False)  # Prevent word wrapping
         label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # Align text properly
-        self.warning_layout.addWidget(label)
         if num == 0:
             self.tab_widget.setTabText(1, "Warning")
         else:
             self.tab_widget.setTabText(1, "Warning "+str(num))
+        self.warning_layout.addWidget(label)
 
     def add_url_to_error_tab(self, url, num=0):
         """Add a URL to the Error tab (red)"""
@@ -693,12 +693,12 @@ class DarkThemeApp(QMainWindow):
         label.setObjectName("error_tab_label")
         label.setFixedHeight(18)  # Set fixed height
         label.setWordWrap(False)  # Prevent word wrapping
-        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # Align text properly
-        self.error_layout.addWidget(label)
+        label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # Align text properly 
         if num == 0:
             self.tab_widget.setTabText(2, "Error")
         else:
             self.tab_widget.setTabText(2, "Error "+str(num))
+        self.error_layout.addWidget(label)
             
     def select_button_by_sender(self, button):
         """
