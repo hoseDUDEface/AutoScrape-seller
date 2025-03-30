@@ -1,5 +1,6 @@
 import sys
 import os  # Add this at the top with other imports
+from PyQt5 import QtGui
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QGridLayout, QPushButton, QLabel, 
                             QLineEdit, QFileDialog, QFrame, QSizePolicy,
@@ -22,8 +23,10 @@ class DarkThemeApp(QMainWindow):
         super().__init__()
         
         # Set window properties
-        self.setWindowTitle("CMScrape v2")
+        self.setWindowTitle("AutoScrape 0.1")
         self.setMinimumSize(1000, 600)  # Increased width for the split view
+        self.setWindowIcon(QtGui.QIcon('icon.png'))
+
         
         # Set dark theme
         self.set_dark_theme()
