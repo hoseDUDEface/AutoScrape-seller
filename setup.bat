@@ -86,6 +86,7 @@ if exist Backend/requirementsjs.txt (
     for /F "tokens=*" %%i in (Backend/requirementsjs.txt) do (
         echo Installing: %%i
         npm install -g %%i
+		npm install %%i
         if %ERRORLEVEL% NEQ 0 (
             echo Failed to install %%i
         )
