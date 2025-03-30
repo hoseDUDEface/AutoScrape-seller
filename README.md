@@ -68,3 +68,287 @@ Headless mode runs the browser without showing a window.
 - **Headless (True)**: Way faster and lets you use your computer while scraping happens in background. Easier for websites to detect as a bot though.
 
 - **Not Headless (False)**: Browser window opens and takes over your screen, making it unusable while scraping. Slower but way harder to detect. Use this for heavily protected websites.
+
+#### Using Plugins
+By default, AutoScrape only saves the raw HTML of scraped pages to the `Backend/scraped_html/` directory. To extract structured data:
+
+1. Select a plugin from the dropdown menu in the interface
+2. When you run the scraper, it will process the HTML with your selected plugin
+3. Extracted data is saved as CSV files in `Backend/scraped_data/`
+
+This lets you automatically extract specific information like prices, product details, or other structured data from the scraped websites.
+
+## Creating Custom Plugins
+
+AutoScrape supports custom parser plugins that can extract specific data from the scraped HTML. These plugins process websites you scrape and output structured data.
+
+### Plugin Structure
+
+Plugins are Python classes with a specific interface. Each plugin must:
+
+1. Be placed in the `Backend/plugins` directory
+2. Import the necessary modules (`ScrapedField` and `DataType` from `templated_plugin`)
+3. Implement all required interface methods
+
+### Basic Plugin Template
+
+<details>
+<summary>Click to view basic plugin template</summary>
+
+```python
+from dataclasses import dataclass
+from typing import Any, List, Optional, Type, Union
+from bs4 import BeautifulSoup
+from templated_plugin import ScrapedField, DataType
+
+class MyCustomPlugin:
+    """Plugin that extracts specific data from a website."""
+    
+    def get_name(self) -> str:
+        """Return the name of the plugin."""
+        return "My Custom Plugin"
+    
+    def get_description(self) -> str:
+        """Return a description of what the plugin extracts."""
+        return "Extracts important data from my favorite website"
+    
+    def get_version(self) -> str:
+        """Return the version of the plugin."""
+        return "1.0.0"
+    
+    def get_available_fields(self) -> List[ScrapedField]:
+        """
+        Returns all possible fields this plugin can extract, with default values.
+        """
+        return [
+            ScrapedField(
+                name="title",
+                value="Example Title",
+                field_type=DataType.STRING,
+                description="The title of the page",
+                accumulate=True
+            ),
+            ScrapedField(
+                name="price",
+                value="$19.99",
+                field_type=DataType.STRING,
+                description="The price of the item",
+                accumulate=True
+            )
+        ]
+
+    def parse(self, html: str) -> List[ScrapedField]:
+        """
+        Parse HTML content and extract data.
+        """
+        soup = BeautifulSoup(html, 'html.parser')
+        results = []
+        
+        # Extract title
+        title_element = soup.select_one('h1.product-title')
+        if title_element:
+            results.append(ScrapedField(
+                name="title",
+                value=title_element.get_text().strip(),
+                field_type=DataType.STRING,
+                description="The title of the page",
+                accumulate=True
+            ))
+        
+        # Extract price
+        price_element = soup.select_one('span.price')
+        if price_element:
+            results.append(ScrapedField(
+                name="price",
+                value=price_element.get_text().strip(),
+                field_type=DataType.STRING,
+                description="The price of the item",
+                accumulate=True
+            ))
+        
+        return results
+```
+</details>
+
+### The ScrapedField Class
+
+The `ScrapedField` class defines the data fields your plugin extracts:
+
+- **name**: Identifier for the field
+- **value**: The extracted value
+- **field_type**: Data type (STRING, INTEGER, FLOAT, BOOLEAN, etc.)
+- **description**: Human-readable description of the field
+- **accumulate**: Whether to collect multiple values for this field across scrapes
+
+### Data Types
+
+Available data types from the `DataType` enum:
+
+- `DataType.STRING`: For text values
+- `DataType.INTEGER`: For whole numbers
+- `DataType.FLOAT`: For decimal numbers
+- `DataType.BOOLEAN`: For true/false values
+- `DataType.JSON`: For structured data
+
+### Advanced Plugin Example
+
+<details>
+<summary>Click to view advanced plugin example</summary>
+
+```python
+class CardmarketPricePlugin:
+    """Plugin that extracts price information from Cardmarket pages."""
+    
+    # Global configuration flag to control whether prices are stored as floats or formatted strings
+    STORE_PRICES_AS_FLOAT = False  # Set to True to store prices as float values without currency symbols
+    
+    def get_name(self) -> str:
+        """Return the name of the plugin."""
+        return "Cardmarket Price Plugin"
+    
+    def get_description(self) -> str:
+        """Return a description of what the plugin extracts."""
+        return "Extracts price information from Cardmarket product pages across different games and languages"
+    
+    def get_version(self) -> str:
+        """Return the version of the plugin."""
+        return "1.0.0"
+    
+    def get_available_fields(self) -> List[ScrapedField]:
+        """
+        Returns all possible fields this plugin can extract, with default values.
+        """
+        return [
+            ScrapedField(
+                name="card_name",
+                value="Example Card",
+                field_type=DataType.STRING,
+                description="Name of the card",
+                accumulate=True
+            ),
+            ScrapedField(
+                name="card_set",
+                value="Example Set",
+                field_type=DataType.STRING,
+                description="Set/expansion the card belongs to",
+                accumulate=True
+            ),
+            ScrapedField(
+                name="available_items",
+                value=500,
+                field_type=DataType.INTEGER,
+                description="Number of available items for sale",
+                accumulate=True
+            ),
+            ScrapedField(
+                name="lowest_price",
+                value=1.00 if self.STORE_PRICES_AS_FLOAT else "1,00 €",
+                field_type=DataType.FLOAT if self.STORE_PRICES_AS_FLOAT else DataType.STRING,
+                description="Lowest price available for the card",
+                accumulate=True
+            ),
+            ScrapedField(
+                name="card_rarity",
+                value="Uncommon",
+                field_type=DataType.STRING,
+                description="Rarity of the card",
+                accumulate=True
+            )
+        ]
+        
+    def _clean_price_string(self, price_string: str) -> str:
+        """Clean and fix encoding issues in price strings."""
+        if not price_string:
+            return ""
+            
+        # Handle common encoding issues
+        cleaned = price_string.replace("â‚¬", "€")
+        cleaned = cleaned.replace("Â£", "£")
+        cleaned = cleaned.replace("Â$", "$")
+        
+        # Remove any extra whitespace
+        cleaned = cleaned.strip()
+        
+        return cleaned
+    
+    def _parse_price_to_float(self, price_string: str) -> float:
+        """Parse a price string into a float value, removing currency symbols."""
+        if not price_string:
+            return 0.0
+            
+        try:
+            # Remove currency symbols and other non-numeric characters
+            cleaned = ''.join(c for c in price_string if c.isdigit() or c in ',.').strip()
+            
+            # Handle European number format (comma as decimal separator)
+            if ',' in cleaned and '.' in cleaned:
+                # If both are present, assume European format with thousand separators
+                cleaned = cleaned.replace('.', '')  # Remove thousand separators
+                cleaned = cleaned.replace(',', '.')  # Convert decimal separator
+            elif ',' in cleaned:
+                # Only comma present, assume it's a decimal separator
+                cleaned = cleaned.replace(',', '.')
+                
+            return float(cleaned)
+        except ValueError:
+            return 0.0
+    
+    def parse(self, html: str) -> List[ScrapedField]:
+        """Parse HTML content and extract Cardmarket price information."""
+        soup = BeautifulSoup(html, 'html.parser')
+        results = []
+        
+        # Extract card name and set
+        try:
+            title_container = soup.select_one('.page-title-container')
+            if title_container:
+                h1 = title_container.select_one('h1')
+                if h1:
+                    # Extract main card name (text before the span)
+                    card_name = h1.get_text().strip()
+                    set_span = h1.select_one('span')
+                    if set_span:
+                        card_name = card_name.replace(set_span.get_text(), '').strip()
+                        card_set = set_span.get_text().strip()
+                        
+                        results.append(ScrapedField(
+                            name="card_name",
+                            value=card_name,
+                            field_type=DataType.STRING,
+                            description="Name of the card",
+                            accumulate=True
+                        ))
+                        
+                        results.append(ScrapedField(
+                            name="card_set",
+                            value=card_set,
+                            field_type=DataType.STRING,
+                            description="Set/expansion the card belongs to",
+                            accumulate=True
+                        ))
+        except Exception:
+            # Continue even if card name extraction fails
+            pass
+        
+        # Find the info container
+        container = soup.select_one('.info-list-container')
+        if not container:
+            return results
+            
+        # Process prices, rarity, etc.
+        # ... (additional extraction code)
+        
+        return results
+```
+</details>
+
+### Using Your Plugin
+
+Once you've created your plugin:
+
+1. Place the Python file in the `Backend/plugins` directory
+2. Restart AutoScrape
+3. Your plugin will be automatically loaded and available for use
+4. When scraping a website, your plugin will process the HTML and save structured data
+
+The extracted data from plugins is saved in the `Backend/scraped_data/` directory in CSV format.
