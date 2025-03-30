@@ -28,6 +28,26 @@ This software is provided for personal use in a protected environment only. I ca
 ## Software View
 ![image](https://github.com/user-attachments/assets/167de176-eb6a-43ad-815c-53b39289b95b)
 
+## Example 
+
+<div align="center">
+  <h2>Comparison: Headless vs Not Headless Mode</h2>
+  <table>
+    <tr>
+      <th>Hero + stealth Not Headless</th>
+      <th>Standard Selenium Headless</th>
+    </tr>
+    <tr>
+      <td>
+        <video src="https://github.com/user-attachments/assets/628388e5-0e39-4bdd-9fbf-a7ce5a0189fd" controls width="400"></video>
+      </td>
+      <td>
+        <video src="https://github.com/user-attachments/assets/e24171c9-5062-455e-b06e-d188c48d68e7" controls width="400"></video>
+      </td>
+    </tr>
+  </table>
+</div>
+
 ## Setup
 Run the script setup.bat to :
 1) Install Python3 if not installed
