@@ -4,7 +4,14 @@
 <p align="center" style="font-size: 28px;">
   Scrape a list of urls with 10 different technologies, automatically, and parse the results with your own custom plugin.
 </p>
-  
+<p align="center">
+  <a href="https://discord.com/invite/a3urQuhcC5">
+    <img src="https://dcbadge.limes.pink/api/server/a3urQuhcC5?style=flat-square" alt="Join us on discord!" />
+  </a>
+</p>
+
+
+
 ## Disclaimer
 
 <details>
