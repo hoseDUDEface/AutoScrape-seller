@@ -488,46 +488,36 @@ class ScraperWorker(QThread):
                         # Create an instance and parse the HTML
                         plugin_instance = plugin_class()
                         parsed_results = plugin_instance.parse(html)
-                        
-                        print(f"\n> Plugin results for {url}:")
-                        for field in parsed_results:
-                            print(f"  {field.name}: {field.value}" + 
-                                (f" ({field.description})" if field.description else ""))
-                        
-                        # Emit the results to the app
-                        self.plugin_results.emit(parsed_results)
-                        
-                        # Write results to CSV
-                        try:
-                            # Prepare data for CSV - include URL for reference
-                            csv_row = {'url': url}
-                            
-                            # Add all fields to the row
-                            for field in parsed_results:
-                                # Convert the value to string if it's not
-                                if field.value is not None:
-                                    csv_row[field.name] = str(field.value)
-                                else:
-                                    csv_row[field.name] = ""
-                            
-                            # Get all field names for header
-                            field_names = ['url'] + [field.name for field in parsed_results]
-                            
-                            # Write to CSV file
+
+                        # Initialize a list to hold all card data
+                        all_card_data = []
+
+                        # Assuming 'parsed_results' is a list of lists, where each inner list contains ScrapedField objects
+                        for card_fields in parsed_results:
+                            # Create a dictionary for the current card's data
+                            card_data = {'url': url}
+                            for field in card_fields:
+                                if field.found and field.name:
+                                    card_data[field.name] = str(field.value) if field.value is not None else ""
+                            all_card_data.append(card_data)
+
+                        # Determine the fieldnames (header) from the first card's data
+                        if all_card_data:
+                            fieldnames = ['url'] + [field.name for field in parsed_results[0]]
+                        else:
+                            fieldnames = []
+
+                        # Write all card data to the CSV file at once
+                        if all_card_data:
                             with open(self.csv_path, mode='a', newline='', encoding='utf-8') as csv_file:
-                                writer = csv.DictWriter(csv_file, fieldnames=field_names)
-                                
-                                # Write header if this is the first time
-                                if not self.csv_header_written:
+                                writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+                                # Write header only if the file is empty
+                                if csv_file.tell() == 0:
                                     writer.writeheader()
-                                    self.csv_header_written = True
-                                
-                                # Write the data row
-                                writer.writerow(csv_row)
-                            
+                                writer.writerows(all_card_data)
                             print(f"> CSV data saved to: {self.csv_path}")
-                        except Exception as csv_e:
-                            print(f"> Error saving to CSV: {str(csv_e)}")
+                        else:
+                            print("> No card data to write.")
                         
                     else:
                         print(f"> Error: Could not find plugin class in {plugin_path}")

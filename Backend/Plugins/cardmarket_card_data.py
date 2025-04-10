@@ -5,6 +5,7 @@ import html
 import re
 from templated_plugin import ScrapedField, DataType
 
+
 class CardmarketPricePlugin:
     """Plugin that extracts price information from Cardmarket pages."""
     
